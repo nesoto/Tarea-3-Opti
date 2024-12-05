@@ -19,16 +19,6 @@ def resolver_modelo(modelo, tiempo_limite):
         return None, modelo.NumVars, modelo.NumConstrs
 
 # ==== EJECUCIÓN PRINCIPAL ====
-def resolver_modelo(modelo, tiempo_limite):
-    modelo.setParam("TimeLimit", tiempo_limite)
-    modelo.optimize()
-
-    if modelo.status == GRB.OPTIMAL:
-        return modelo.objVal, modelo.NumVars, modelo.NumConstrs
-    else:
-        return None, modelo.NumVars, modelo.NumConstrs
-
-# ==== EJECUCIÓN PRINCIPAL ====
 if __name__ == "__main__":
     DATA_FOLDERS = ["Instancias1", "Instancias2", "Instancias3"]
     TIME_LIMIT = 1800
