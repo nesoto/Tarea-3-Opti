@@ -9,14 +9,24 @@ from gurobi_models import modelo_scf_gurobi, modelo_dl_gurobi
 
 
 # ==== RESOLUCIÓN ====
-def resolver_modelo(modelo, time_limit):
-    try:
-        modelo.parameters.timelimit = time_limit
-        solucion = modelo.solve(log_output=False)
-        return solucion.objective_value
-    except Exception as e:
-        print(f"Error al resolver el modelo: {e}")
-        return None
+def resolver_modelo(modelo, tiempo_limite):
+    modelo.setParam("TimeLimit", tiempo_limite)
+    modelo.optimize()
+
+    if modelo.status == GRB.OPTIMAL:
+        return modelo.objVal, modelo.NumVars, modelo.NumConstrs
+    else:
+        return None, modelo.NumVars, modelo.NumConstrs
+
+# ==== EJECUCIÓN PRINCIPAL ====
+def resolver_modelo(modelo, tiempo_limite):
+    modelo.setParam("TimeLimit", tiempo_limite)
+    modelo.optimize()
+
+    if modelo.status == GRB.OPTIMAL:
+        return modelo.objVal, modelo.NumVars, modelo.NumConstrs
+    else:
+        return None, modelo.NumVars, modelo.NumConstrs
 
 # ==== EJECUCIÓN PRINCIPAL ====
 if __name__ == "__main__":
@@ -51,19 +61,22 @@ if __name__ == "__main__":
                 # Usando CPLEX
                 start_time = time.time()
                 modelo = modelo_scf_cplex(costos, num_depositos, num_clientes, capacidad, demandas)
-                resultado_scf = resolver_modelo(modelo, TIME_LIMIT)
+                resultado_scf, num_vars, num_constrs = resolver_modelo(modelo, TIME_LIMIT)
                 end_time = time.time()
                 elapsed_time_scf = end_time - start_time
-                print(f"Resultados de la instancia {idx} (SCF) en cplex: {resultado_scf}")
-                resultados_cplex.append((archivo, "SCF", resultado_scf, elapsed_time_scf))
+                print(f"Resultados de la instancia {idx} (SCF) en CPLEX: {resultado_scf}")
+                print(f"  Variables: {num_vars}, Restricciones: {num_constrs}")
+                resultados_cplex.append((archivo, "SCF", resultado_scf, elapsed_time_scf, num_vars, num_constrs))
+
                 # Usando Gurobi
                 start_time = time.time()
                 modelo = modelo_scf_gurobi(costos, num_depositos, num_clientes, capacidad, demandas)
-                resultado_scf = resolver_modelo(modelo, TIME_LIMIT)
+                resultado_scf, num_vars, num_constrs = resolver_modelo(modelo, TIME_LIMIT)
                 end_time = time.time()
                 elapsed_time_scf = end_time - start_time
-                print(f"Resultados de la instancia {idx} (SCF) en gurobi: {resultado_scf}")
-                resultados_gurobi.append((archivo, "SCF", resultado_scf, elapsed_time_scf))
+                print(f"Resultados de la instancia {idx} (SCF) en Gurobi: {resultado_scf}")
+                print(f"  Variables: {num_vars}, Restricciones: {num_constrs}")
+                resultados_gurobi.append((archivo, "SCF", resultado_scf, elapsed_time_scf, num_vars, num_constrs))
             except Exception as e:
                 print(f"Error al resolver la instancia {archivo} (SCF): {e}")
 
@@ -73,32 +86,36 @@ if __name__ == "__main__":
                 # Usando CPLEX
                 start_time = time.time()
                 modelo = modelo_dl_cplex(costos, num_depositos, num_clientes, capacidad, demandas)
-                resultado_dl = resolver_modelo(modelo, TIME_LIMIT)
+                resultado_dl, num_vars, num_constrs = resolver_modelo(modelo, TIME_LIMIT)
                 end_time = time.time()
                 elapsed_time_dl = end_time - start_time
-                print(f"Resultados de la instancia {idx} (DL): {resultado_dl}")
-                resultados_cplex.append((archivo, "DL", resultado_dl, elapsed_time_dl))
+                print(f"Resultados de la instancia {idx} (DL) en CPLEX: {resultado_dl}")
+                print(f"  Variables: {num_vars}, Restricciones: {num_constrs}")
+                resultados_cplex.append((archivo, "DL", resultado_dl, elapsed_time_dl, num_vars, num_constrs))
+
                 # Usando Gurobi
                 start_time = time.time()
                 modelo = modelo_dl_gurobi(costos, num_depositos, num_clientes, capacidad, demandas)
-                resultado_dl = resolver_modelo(modelo, TIME_LIMIT)
+                resultado_dl, num_vars, num_constrs = resolver_modelo(modelo, TIME_LIMIT)
                 end_time = time.time()
                 elapsed_time_dl = end_time - start_time
-                print(f"Resultados de la instancia {idx} (DL) en gurobi: {resultado_dl}")
-                resultados_gurobi.append((archivo, "DL", resultado_dl, elapsed_time_dl))
+                print(f"Resultados de la instancia {idx} (DL) en Gurobi: {resultado_dl}")
+                print(f"  Variables: {num_vars}, Restricciones: {num_constrs}")
+                resultados_gurobi.append((archivo, "DL", resultado_dl, elapsed_time_dl, num_vars, num_constrs))
             except Exception as e:
                 print(f"Error al resolver la instancia {archivo} (DL): {e}")
 
     # Generar reporte en Excel
-    df = pd.DataFrame(resultados_cplex, columns=["Archivo", "Modelo", "Resultado", "Tiempo (s)"])
-    df.to_excel("resultados_cplex.xlsx", index=False)
-    df2 = pd.DataFrame(resultados_gurobi, columns=["Archivo", "Modelo", "Resultado", "Tiempo (s)"])
-    df2.to_excel("resultados_gurobi.xlsx", index=False)
+    df_cplex = pd.DataFrame(resultados_cplex, columns=["Archivo", "Modelo", "Resultado", "Tiempo (s)", "Variables", "Restricciones"])
+    df_cplex.to_excel("resultados_cplex.xlsx", index=False)
+
+    df_gurobi = pd.DataFrame(resultados_gurobi, columns=["Archivo", "Modelo", "Resultado", "Tiempo (s)", "Variables", "Restricciones"])
+    df_gurobi.to_excel("resultados_gurobi.xlsx", index=False)
 
     print("\n--- Resultados Finales ---")
     print("Resultados de CPLEX:")
-    for idx, (archivo, modelo, resultado, tiempo) in enumerate(resultados_cplex, start=1):
-        print(f"Instancia {idx} ({archivo}, {modelo}): {resultado}, Tiempo: {tiempo:.2f} segundos")
+    for idx, (archivo, modelo, resultado, tiempo, vars_, constrs) in enumerate(resultados_cplex, start=1):
+        print(f"Instancia {idx} ({archivo}, {modelo}): Resultado={resultado}, Tiempo={tiempo:.2f} segundos, Variables={vars_}, Restricciones={constrs}")
     print("Resultados de Gurobi:")
-    for idx, (archivo, modelo, resultado, tiempo) in enumerate(resultados_gurobi, start=1):
-        print(f"Instancia {idx} ({archivo}, {modelo}): {resultado}, Tiempo: {tiempo:.2f} segundos")
+    for idx, (archivo, modelo, resultado, tiempo, vars_, constrs) in enumerate(resultados_gurobi, start=1):
+        print(f"Instancia {idx} ({archivo}, {modelo}): Resultado={resultado}, Tiempo={tiempo:.2f} segundos, Variables={vars_}, Restricciones={constrs}"
